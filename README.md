@@ -1,1 +1,1 @@
-"* Lockwood" 
+* Lockwood
