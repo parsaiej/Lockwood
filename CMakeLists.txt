@@ -1,33 +1,55 @@
-#LOCKWOOD PLUS: FORWARD PLUS RENDER ENGINE
+############################
+# Generate Lockwood Source #
+############################
 
 cmake_minimum_required(VERSION 2.8)
 PROJECT(Lockwood)
 set(CMAAKE_CXX_STANDARD 14)
 
-set(THIRDP "ThirdParty") #Include Third Party
-
-#GLFW FindVulkan Module.
-list(APPEND CMAKE_MODULE_PATH "${THIRDP}/glfw/CMake/modules/")
-
-include_directories("${THIRDP}/stb/")
-include_directories("${THIRDP}/tinyobjloader/")
-include_directories("${THIRDP}/glm/")
-
-#GLFW Config
-set(GLFW_ROOT "${THIRDP}/glfw")
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+#Third Party Dependencies
+set(THIRDP "ThirdParty")
+#---------------------------------------
+set(GLFW_ROOT "${THIRDP}/glfw")                                     #GLFW
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 add_subdirectory(${GLFW_ROOT})
 include_directories("$(GLFW_ROOT}/include")
 
-#Locate Vulkan
-find_package(Vulkan REQUIRED)
+include_directories("${THIRDP}/glm/")                               #GLM
+include_directories("${THIRDP}/stb/")                               #STB
+include_directories("${THIRDP}/tinyobjloader/")                     #TINY OBJ LOADER
 
-set(SOURCE 
-    "Source/main.cpp")
+list(APPEND CMAKE_MODULE_PATH "${THIRDP}/glfw/CMake/modules/")  
+find_package(Vulkan REQUIRED)                                       #VULKAN
+#----------------------------------------
 
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCE})
+#Source Files. Append New Files Here.
+set(SRC "Lockwood")
+#----------------------------------------
+set(SOURCES 
+    "${SRC}/Source/main.cpp"
+    "${SRC}/Source/LApplication.cpp"
+    "${SRC}/Source/LWindow.cpp"
+    "${SRC}/Source/LUtility.cpp"
+    "${SRC}/Source/LVContext.cpp"
+    "${SRC}/Source/LVForwardPlusRenderCore.cpp"
+)
+
+set(HEADERS
+    "${SRC}/LApplication.h"
+    "${SRC}/LWindow.h"
+    "${SRC}/LUtility.h"
+    "${SRC}/LVContext.h"
+    "${SRC}/LVWrapper.h"
+    "${SRC}/LVForwardPlusRenderCore.h"
+)
+#----------------------------------------
+
+source_group(Source FILES ${SOURCES})
+source_group(Header FILES ${HEADERS})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+
 target_link_libraries(${CMAKE_PROJECT_NAME} glfw) 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${Vulkan_LIBRARIES})
