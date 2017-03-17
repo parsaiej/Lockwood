@@ -13,15 +13,17 @@ public:
 	LVContext(GLFWwindow *_window);
 	~LVContext() {};
 
+	std::array<int, 2> WindowFramebufferSize();
+
 	//Vulkan Context Handle Getter Interface
-	//------------------------------------------------
-	inline VkInstance       GetInstance()       const { return m_VInstance.Get(); }
-	inline VkSurfaceKHR     GetSurface()        const { return m_VSurface.Get();  }
+	//-----------------------------------------------------------------------------
+	inline const LVWrapper<VkDevice>&	GetDevice()		    const { return m_VDevice; }
+	inline VkSurfaceKHR     GetSurface()        const { return m_VSurface;  }
 	inline VkPhysicalDevice GetPhysicalDevice() const { return m_VPhysicalDevice; }
-	inline VkDevice			GetDevice()		    const { return m_VDevice; }
+	inline VkCommandPool	GetCommandPool()	const { return m_VCommandPool; }
 	inline VkQueue			GetGraphicsQueue()  const { return m_VGraphicsQueue; }
-	inline VkQueue			GetPresent()		const { return m_VPresentQueue; }
-	//------------------------------------------------
+	inline VkQueue			GetPresentQueue()	const { return m_VPresentQueue; }
+	//-----------------------------------------------------------------------------
 
 private:
 	GLFWwindow *m_glfwWindowHandle;

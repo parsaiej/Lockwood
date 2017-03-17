@@ -41,6 +41,12 @@ std::vector<const char *> GetRequiredExtensions() {
 	return extensions;
 }
 
+std::array<int, 2> LVContext::WindowFramebufferSize() {
+	int w, h;
+	glfwGetFramebufferSize(m_glfwWindowHandle, &w, &h);
+	return std::array<int, 2> {w, h};
+}
+
 void LVContext::CreateInstance() {
 	if (VALIDATION_LAYERS && !LUtility::CheckValidationLayerSupport())
 		LUtility::RuntimeError("Validation Layers Requested, But Unavailable.");
@@ -130,11 +136,11 @@ void LVContext::CreateLogicalDevice() {
 	createinfo.pQueueCreateInfos = queueCreateInfos.data();
 	createinfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
 	createinfo.pEnabledFeatures = &deviceFeatures;
-	createinfo.enabledExtensionCount = LUtility::VulkanExtensions.size();
+	createinfo.enabledExtensionCount = static_cast<uint32_t>(LUtility::VulkanExtensions.size());
 	createinfo.ppEnabledExtensionNames = LUtility::VulkanExtensions.data();
 
 	if (VALIDATION_LAYERS) {
-		createinfo.enabledLayerCount = LUtility::ValidationLayers.size();
+		createinfo.enabledLayerCount = static_cast<uint32_t>(LUtility::ValidationLayers.size());
 		createinfo.ppEnabledLayerNames = LUtility::ValidationLayers.data();
 	}
 	else {

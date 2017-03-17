@@ -24,10 +24,11 @@ void LApplication::Initialize(int argc, const char *argv[]) {
 
 void LApplication::Run() {
 
-	while (m_Window->ShouldClose()) {
+	while (!m_Window->ShouldClose()) {
 		m_Window->PollEvents();
 
 		Update();
+		m_Renderer->Draw();
 	}
 
 	m_Window->Close();

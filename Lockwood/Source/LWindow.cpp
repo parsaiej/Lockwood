@@ -2,6 +2,7 @@
 #include <GLFW\glfw3.h>
 
 #include "..\LWindow.h"
+#include "..\LUtility.h"
 
 LWindow::LWindow(unsigned int _width, unsigned int _height, const char *_title) {
 	glfwInit();
@@ -10,9 +11,8 @@ LWindow::LWindow(unsigned int _width, unsigned int _height, const char *_title) 
 	m_glfwWindow = glfwCreateWindow(_width, _height, _title, nullptr, nullptr);
 	glfwSetWindowUserPointer(m_glfwWindow, this);
 
-	if (!m_glfwWindow) {
-		throw std::runtime_error("Error Initializing Window.");
-	}
+	if (!m_glfwWindow) LUtility::RuntimeError("Error Initializing Window.");
+	LUtility::Log("Window Created.");
 }
 
 LWindow::~LWindow() {
@@ -20,7 +20,7 @@ LWindow::~LWindow() {
 }
 
 bool LWindow::ShouldClose() {
-	return !glfwWindowShouldClose(m_glfwWindow);
+	return glfwWindowShouldClose(m_glfwWindow);
 }
 
 void LWindow::PollEvents() {

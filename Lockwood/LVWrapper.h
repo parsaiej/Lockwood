@@ -14,12 +14,12 @@ public:
 		deleter = [=](T obj) { _deleteFunc(obj, nullptr); };
 	}
 
-	LVWrapper(const LVWrapper<VkInstance> &_instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> _deleteFunc) {
-		deleter = [&_instance, _deleteFunc](T obj) { _deleteFunc(_instance, obj, nullptr); };
+	LVWrapper(const LVWrapper<VkDevice> &_device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> _deleteFunc) {
+		deleter = [&_device, _deleteFunc](T obj) { _deleteFunc(_device, obj, nullptr); };
 	}
 
-	LVWrapper(const LVWrapper<VkDevice> &_device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> _deleteFunc) {
-		deleter = [&_device,   _deleteFunc](T obj) { _deleteFunc(_device,   obj, nullptr); };
+	LVWrapper(const LVWrapper<VkInstance> &_instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> _deleteFunc) {
+		deleter = [&_instance, _deleteFunc](T obj) { _deleteFunc(_instance, obj, nullptr); };
 	}
 
 	~LVWrapper() { CleanUp(); }
