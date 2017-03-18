@@ -18,4 +18,5 @@ public:
 private:
 	std::unique_ptr<LWindow>				 m_Window;
 	std::unique_ptr<LVForwardPlusRenderCore> m_Renderer;
+	float m_TestFloat;
 };

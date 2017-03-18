@@ -21,12 +21,14 @@ public:
 	~LVForwardPlusRenderCore();
 
 	void Draw();
-	void PrepareGUI();
 	void Update();
 	void Cleanup();
 
+	void RegisterCallbackGUI(std::function<void()> _callback);
+
 private:
 	std::unique_ptr<LVContext> m_VContext;
+	std::function<void()> m_GuiCallback;
 
 	LVWrapper<VkSwapchainKHR>				  m_VSwapChain;
 	std::vector<LVWrapper<VkImageView>>		  m_VSwapChainImageViews;

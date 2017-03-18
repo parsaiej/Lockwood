@@ -122,6 +122,10 @@ void LVForwardPlusRenderCore::Cleanup() {
 	ImGui_ImplGlfwVulkan_Shutdown();
 }
 
+void LVForwardPlusRenderCore::RegisterCallbackGUI(std::function<void()> _callback) {
+	m_GuiCallback = _callback;
+}
+
 //Initalization Functionality
 //--------------------------------------------------------------------
 void LVForwardPlusRenderCore::CreateSwapChain() {
@@ -675,7 +679,7 @@ void LVForwardPlusRenderCore::RecordCommandBuffers(int i) {
 	//GUI
 	//------------------------------------
 	ImGui_ImplGlfwVulkan_NewFrame();
-	ImGui::ShowTestWindow(); //1.) Get Callback working. 2.) Rerecord the command buffers.
+	m_GuiCallback();
 	//------------------------------------
 
 
