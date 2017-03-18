@@ -1,6 +1,6 @@
 # Lockwood
 Lockwood is a forward plus Vulkan render engine currently being developed for educational purposes.
-![test](http://i.imgur.com/LY8cL0E.gifv)
+![test](http://i.imgur.com/lWhSEOO.png)
 
 ## Build Instructions
 * Clone the repository.
