@@ -1,4 +1,5 @@
 #pragma once
+#include "LVWrapper.h"
 
 #include <iostream>
 #include <vector>
@@ -7,11 +8,17 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <unordered_map>
+#include <chrono>
 
-#include "LVWrapper.h"
+#define GLFW_INCLUDE_VULKAN
+#include "GLFW\glfw3.h"
 
-#include <vulkan\vulkan.h>
+#define GLM_FORCE_RADIANS
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm\glm.hpp>
+#include <glm\gtc\matrix_transform.hpp>
+#include <glm\gtx\hash.hpp>
 
 namespace LUtility {
 
@@ -63,6 +70,7 @@ namespace LUtility {
 			return attributeDescriptions;
 		}
 
+		//Equality operator for hash maps
 		bool operator==(const Vertex &other) const {
 			return position == other.position && color == other.color && texCoord == other.texCoord;
 		}
@@ -83,27 +91,32 @@ namespace LUtility {
 		std::vector<VkPresentModeKHR>	presentModes;
 	};
 
+	QueueFamilyIndices		FindQueueIndices(VkPhysicalDevice _device, VkSurfaceKHR _surface);
+	SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice _device, VkSurfaceKHR _surface);
+	VkSurfaceFormatKHR		ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &_availableFormats);
+	VkPresentModeKHR		ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> _availablePresentModes);
+	VkExtent2D				ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &_capabilities, std::array<int, 2> _windowFramebufferSize);
+	VkFormat				FindDepthFormat(const VkPhysicalDevice &_device);
+	VkFormat				FindSupportedFormat(const std::vector<VkFormat> &_candidates, VkImageTiling _tiling, VkFormatFeatureFlags _features, const VkPhysicalDevice &_device);
+	uint32_t				FindMemoryType(uint32_t _typeFilter, VkMemoryPropertyFlags _properties, const VkPhysicalDevice &_physicalDevice);
+	std::vector<char>		ReadFile(const std::string &_filePath);
+	bool					CheckDeviceExtensionSupport(VkPhysicalDevice _device);
+	bool					IsDeviceSuitable(VkPhysicalDevice _device, VkSurfaceKHR _surface);
+	bool					CheckValidationLayerSupport();
+	inline bool				HasStencilComponent(VkFormat _format) { return _format == VK_FORMAT_D32_SFLOAT_S8_UINT || _format == VK_FORMAT_D24_UNORM_S8_UINT; }
+	void					LoadModel(const std::string &_filePath, std::vector<Vertex> &_vertices, std::vector<uint32_t> &_indices);
+	void					CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage, VkMemoryPropertyFlags _properties, LVWrapper<VkBuffer> &_buffer, LVWrapper<VkDeviceMemory> &_bufferMemory, const VkDevice &_device, const VkPhysicalDevice &_physicalDevice);
+	void					CopyBuffer(VkBuffer _srcBuffer, VkBuffer _dstBuffer, VkDeviceSize _size, const VkDevice &_device, const VkCommandPool &_cmdPool, const VkQueue &_gfxQueue);
+	void					CopyImage(VkImage _srcImage, VkImage _dstImage, uint32_t _width, uint32_t _height, const VkDevice &_device, const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool);
+	void					CreateImage(uint32_t _width, uint32_t _height, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties, LVWrapper<VkImage> &_image, LVWrapper<VkDeviceMemory> &_imageMemory, const VkDevice &_device, const VkPhysicalDevice &_physicalDevice);
+	void					CreateImageView(VkImage _image, VkFormat _format, VkImageAspectFlags _aspectFlags, LVWrapper<VkImageView> &_imageView, const VkDevice &_device);
+	void					CreateTextureImage(const std::string &_filePath, LVWrapper<VkImage> &_stagingImage, LVWrapper<VkDeviceMemory> &_stagingImageMemory, LVWrapper<VkImage> &_image, LVWrapper<VkDeviceMemory> &_imageMemory, const VkDevice &_device, const VkPhysicalDevice &_physicalDevice, const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool);
+	void					CreateTextureImageView(VkImage _image, LVWrapper<VkImageView> &_imageView, const VkDevice &_device);
+	void					CreateShaderModule(const std::vector<char>& _code, LVWrapper<VkShaderModule> &_shaderModule, const VkDevice &_device);
+	void					TransitionImageLayout(VkImage _image, VkFormat _format, VkImageLayout _oldLayout, VkImageLayout _newLayout, const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool, const VkDevice &_device);
+
 	VkCommandBuffer BeginSingleTimeCommands(const VkCommandPool &_cmdPool, const VkDevice &_device);
 	void EndSingleTimeCommands(VkCommandBuffer commandBuffer, VkQueue _gfxQueue, const VkCommandPool &_cmdPool, const VkDevice &_device);
-	
-	QueueFamilyIndices FindQueueIndices(VkPhysicalDevice _device, VkSurfaceKHR _surface);
-	SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice _device, VkSurfaceKHR _surface);
-	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &_availableFormats);
-	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> _availablePresentModes);
-	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &_capabilities, std::array<int, 2> _windowFramebufferSize);
-	VkFormat FindDepthFormat(const VkPhysicalDevice &_device);
-	VkFormat FindSupportedFormat(const std::vector<VkFormat> &_candidates, VkImageTiling _tiling, VkFormatFeatureFlags _features, const VkPhysicalDevice &_device);
-	uint32_t FindMemoryType(uint32_t _typeFilter, VkMemoryPropertyFlags _properties, const VkPhysicalDevice &_physicalDevice);
-	std::vector<char> ReadFile(const std::string &_filePath);
-	bool CheckDeviceExtensionSupport(VkPhysicalDevice _device);
-	bool IsDeviceSuitable(VkPhysicalDevice _device, VkSurfaceKHR _surface);
-	bool CheckValidationLayerSupport();
-	inline bool HasStencilComponent(VkFormat _format) { return _format == VK_FORMAT_D32_SFLOAT_S8_UINT || _format == VK_FORMAT_D24_UNORM_S8_UINT; }
-	void CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage, VkMemoryPropertyFlags _properties, LVWrapper<VkBuffer> &_buffer, LVWrapper<VkDeviceMemory> &_bufferMemory, const VkDevice &_device, const VkPhysicalDevice &_physicalDevice);
-	void CreateImage(uint32_t _width, uint32_t _height, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties, LVWrapper<VkImage> &_image, LVWrapper<VkDeviceMemory> &_imageMemory, const VkDevice &_device, const VkPhysicalDevice &_physicalDevice);
-	void CreateImageView(VkImage _image, VkFormat _format, VkImageAspectFlags _aspectFlags, LVWrapper<VkImageView> &_imageView, const VkDevice &_device);
-	void CreateShaderModule(const std::vector<char>& _code, LVWrapper<VkShaderModule> &_shaderModule, const VkDevice &_device);
-	void TransitionImageLayout(VkImage _image, VkFormat _format, VkImageLayout _oldLayout, VkImageLayout _newLayout, const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool, const VkDevice &_device);
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugValidationLayerCallback(VkDebugReportFlagsEXT flags,
 																	   VkDebugReportObjectTypeEXT objType,
@@ -146,4 +159,13 @@ namespace LUtility {
 			func(instance, callback, pAllocator);
 		}
 	}
+}
+
+//Custom hash operator for Vertex struct.
+namespace std {
+	template<> struct hash<LUtility::Vertex> {
+		size_t operator()(LUtility::Vertex const& _vertex) const {
+			return ((hash<glm::vec3>()(_vertex.position) ^ (hash<glm::vec3>()(_vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(_vertex.texCoord) << 1);
+		}
+	};
 }

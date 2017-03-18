@@ -1,5 +1,4 @@
 #include "..\LUtility.h"
-#include <GLFW\glfw3.h>
 
 VkCommandBuffer LUtility::BeginSingleTimeCommands(const VkCommandPool &_cmdPool, const VkDevice &_device) {
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -140,6 +139,7 @@ VkFormat LUtility::FindSupportedFormat(const std::vector<VkFormat> &_candidates,
 		}
 	}
 	RuntimeError("Failed To Find Supported Format.");
+	return VK_FORMAT_UNDEFINED;
 }
 
 VkFormat LUtility::FindDepthFormat(const VkPhysicalDevice &_physicalDevice) {
@@ -227,6 +227,48 @@ bool LUtility::CheckValidationLayerSupport() {
 	return true;
 }
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+void LUtility::LoadModel(const std::string &_filePath, std::vector<Vertex> &_vertices, std::vector<uint32_t> &_indices) {
+
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, _filePath.c_str())) RuntimeError(err.c_str());
+
+	std::unordered_map<Vertex, int> uniqueVertices = {};
+	for (const auto& shape : shapes) {
+		for (const auto& index : shape.mesh.indices) {
+			Vertex vertex = {};
+
+			vertex.position = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = (int)_vertices.size();
+				_vertices.push_back(vertex);
+			}
+
+			_vertices.push_back(vertex);
+			_indices.push_back(uniqueVertices[vertex]);
+		}
+	}
+
+}
+
+
 void LUtility::CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage, VkMemoryPropertyFlags _properties, 
 				LVWrapper<VkBuffer> &_buffer, LVWrapper<VkDeviceMemory> &_bufferMemory, 
 				const VkDevice &_device, const VkPhysicalDevice &_physicalDevice) {
@@ -249,6 +291,46 @@ void LUtility::CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage, VkMem
 	if (vkAllocateMemory(_device, &allocInfo, nullptr, _bufferMemory.Replace()) != VK_SUCCESS)
 		RuntimeError("Failed To Allocate Buffer Memory.");
 	vkBindBufferMemory(_device, _buffer, _bufferMemory, 0);
+}
+
+void LUtility::CopyBuffer(VkBuffer _srcBuffer, VkBuffer _dstBuffer, VkDeviceSize _size,
+						  const VkDevice &_device, const VkCommandPool &_cmdPool, const VkQueue &_gfxQueue) {
+	VkCommandBuffer commandBuffer = BeginSingleTimeCommands(_cmdPool, _device);
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.srcOffset = 0;
+	copyRegion.dstOffset = 0;
+	copyRegion.size = _size;
+	vkCmdCopyBuffer(commandBuffer, _srcBuffer, _dstBuffer, 1, &copyRegion);
+
+	EndSingleTimeCommands(commandBuffer, _gfxQueue, _cmdPool, _device);
+}
+
+void LUtility::CopyImage(VkImage _srcImage, VkImage _dstImage, uint32_t _width, uint32_t _height,
+						 const VkDevice &_device, const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool) {
+	VkCommandBuffer commandBuffer = BeginSingleTimeCommands(_cmdPool, _device);
+
+	VkImageSubresourceLayers subresource = {};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.baseArrayLayer = 0;
+	subresource.mipLevel = 0;
+	subresource.layerCount = 1;
+
+	VkImageCopy region = {};
+	region.srcSubresource = subresource;
+	region.dstSubresource = subresource;
+	region.srcOffset = { 0, 0, 0 };
+	region.dstOffset = { 0, 0, 0 };
+	region.extent.width = _width;
+	region.extent.height = _height;
+	region.extent.depth = 1;
+	vkCmdCopyImage(commandBuffer,
+		_srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		_dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region);
+
+
+	EndSingleTimeCommands(commandBuffer, _gfxQueue, _cmdPool, _device);
 }
 
 void LUtility::CreateImage(uint32_t _width, uint32_t _height, 
@@ -301,6 +383,71 @@ void LUtility::CreateImageView(VkImage _image, VkFormat _format, VkImageAspectFl
 
 	if (vkCreateImageView(_device, &viewInfo, nullptr, _imageView.Replace()) != VK_SUCCESS)
 	    RuntimeError("Failed To Create Texture Image View.");
+}
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+void LUtility::CreateTextureImage(const std::string &_filePath, 
+								  LVWrapper<VkImage> &_stagingImage, LVWrapper<VkDeviceMemory> &_stagingImageMemory,
+								  LVWrapper<VkImage> &_image, LVWrapper<VkDeviceMemory> &_imageMemory, 
+								  const VkDevice &_device, const VkPhysicalDevice &_physicalDevice,
+								  const VkQueue &_gfxQueue, const VkCommandPool &_cmdPool) {
+	int texWidth, texHeight, texChannels;
+	stbi_uc *pixels = stbi_load(_filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+	VkDeviceSize imageSize = texWidth * texHeight * 4;
+	if (!pixels) RuntimeError("Failed To Load Texture Image.");
+
+	CreateImage(texWidth, texHeight,
+				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_TILING_LINEAR,
+				VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				_stagingImage, _stagingImageMemory,
+				_device, _physicalDevice);
+
+	VkImageSubresource subresource = {};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.mipLevel = 0;
+	subresource.arrayLayer = 0;
+
+	VkSubresourceLayout stagingImageLayout;
+	vkGetImageSubresourceLayout(_device, _stagingImage, &subresource, &stagingImageLayout);
+
+	void *data;
+	vkMapMemory(_device, _stagingImageMemory, 0, imageSize, 0, &data);
+	if (stagingImageLayout.rowPitch == texWidth * 4) {
+		memcpy(data, pixels, (size_t)imageSize);
+	}
+	else {
+		uint8_t *dataBytes = reinterpret_cast<uint8_t*>(data);
+		for (int y = 0; y < texHeight; y++) {
+			memcpy(
+				&dataBytes[y * stagingImageLayout.rowPitch],
+				&pixels[y * texWidth * 4],
+				texWidth * 4
+			);
+		}
+	}
+	vkUnmapMemory(_device, _stagingImageMemory);
+	stbi_image_free(pixels);
+
+	CreateImage(texWidth, texHeight,
+				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				_image, _imageMemory,
+				_device, _physicalDevice);
+
+	TransitionImageLayout(_stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _gfxQueue, _cmdPool, _device);
+	TransitionImageLayout(_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _gfxQueue, _cmdPool, _device);
+	CopyImage(_stagingImage, _image, texWidth, texHeight, _device, _gfxQueue, _cmdPool);
+	TransitionImageLayout(_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _gfxQueue, _cmdPool, _device);
+
+}
+
+void LUtility::CreateTextureImageView(VkImage _image, LVWrapper<VkImageView> &_imageView, const VkDevice &_device) {
+	CreateImageView(_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, _imageView, _device);
 }
 
 void LUtility::CreateShaderModule(const std::vector<char>& _code, LVWrapper<VkShaderModule> &_shaderModule, const VkDevice &_device) {

@@ -1,8 +1,9 @@
 #include "..\LVForwardPlusRenderCore.h"
 #include "..\LVContext.h"
 #include "..\LUtility.h"
+#include "..\LVGui.h"
 
-LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window) 
+LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	: m_VContext(std::make_unique<LVContext>(_window)),
 	m_VSwapChain				  { m_VContext->GetDevice(), vkDestroySwapchainKHR},
 	m_VRenderPass				  { m_VContext->GetDevice(), vkDestroyRenderPass },
@@ -16,22 +17,113 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	m_UniformStagingBuffer		  { m_VContext->GetDevice(), vkDestroyBuffer },
 	m_UniformStagingBufferMemory  { m_VContext->GetDevice(), vkFreeMemory },
 	m_UniformBuffer				  { m_VContext->GetDevice(), vkDestroyBuffer },
-	m_UniformBufferMemory		  { m_VContext->GetDevice(), vkFreeMemory }
+	m_UniformBufferMemory		  { m_VContext->GetDevice(), vkFreeMemory },
+	m_VertexBuffer				  { m_VContext->GetDevice(), vkDestroyBuffer },
+	m_VertexBufferMemory		  { m_VContext->GetDevice(), vkFreeMemory },
+	m_IndexBuffer				  { m_VContext->GetDevice(), vkDestroyBuffer },
+	m_IndexBufferMemory			  { m_VContext->GetDevice(), vkFreeMemory },
+	m_TextureImage				  { m_VContext->GetDevice(), vkDestroyImage },
+	m_TextureImageMemory		  { m_VContext->GetDevice(), vkFreeMemory },
+	m_TextureImageView			  { m_VContext->GetDevice(), vkDestroyImageView },
+	m_VDecriptorPool			  { m_VContext->GetDevice(), vkDestroyDescriptorPool },
+	m_VDescriptorSet(VK_NULL_HANDLE),
+	m_VImageAvailableSemaphore	  { m_VContext->GetDevice(), vkDestroySemaphore },
+	m_VRenderFinishedSemaphore	  { m_VContext->GetDevice(), vkDestroySemaphore }
 {
-	LUtility::Log("Vulkan Initialized.");
-	this->CreateSwapChain();
-	this->CreateSwapChainImageViews();
-	this->CreateRenderPasses();
-	this->CreateDescriptorSetLayout();
-	this->CreateGraphicsPipeline();
-	this->CreateDepthResources();
-	this->CreateFramebuffers();
-	this->CreateTextureSampler();
-	this->CreateUniformBuffer();
+	LUtility::Log("Vulkan Context Created.");
+	this->CreateSwapChain();			LUtility::Log("Swap Chain Created");
+	this->CreateSwapChainImageViews();	LUtility::Log("Swap Chain Image Views Created");
+	this->CreateRenderPasses();			LUtility::Log("Render Passes Created");
+	this->CreateDescriptorSetLayout();	LUtility::Log("Descriptor Set Layout Created.");
+	this->CreateGraphicsPipeline();		LUtility::Log("Graphics Pipeline Created.");
+	this->CreateDepthResources();		LUtility::Log("Depth Resources Created");
+	this->CreateFramebuffers();			LUtility::Log("Framebuffers Created.");
+	this->CreateTextureSampler();		LUtility::Log("Texture Sampler Created.");
+	this->CreateUniformBuffer();		LUtility::Log("UBO Created.");
+
+	LUtility::LoadModel("models/chalet.obj", m_Vertices, m_Indices);
+	this->CreateVertexBuffer();
+	this->CreateIndexBuffer();
+	this->CreateTexture();				LUtility::Log("Media Loaded.");
+
+	this->CreateDescriptorPool();		LUtility::Log("Descriptor Pool Created");
+	this->CreateDescriptorSet();		LUtility::Log("Descriptor Set Created.");
+	this->BindGUI();
+	this->CreateCommandBuffers();		LUtility::Log("Command Buffers Recorded.");
+	this->CreateSemaphores();			LUtility::Log("Semaphores Created.");
 }
 
 LVForwardPlusRenderCore::~LVForwardPlusRenderCore() {}
 
+
+void LVForwardPlusRenderCore::Draw() {
+
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(m_VContext->GetDevice(), m_VSwapChain, std::numeric_limits<uint64_t>::max(), m_VImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+	VkResult r;
+	r = vkWaitForFences(m_VContext->GetDevice(), 1, &m_VRenderFences[imageIndex], VK_TRUE, 100);
+
+	RecordCommandBuffers(imageIndex);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkSemaphore waitSemaphores[] = { m_VImageAvailableSemaphore };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &m_VCommandBuffers[imageIndex];
+
+	vkResetFences(m_VContext->GetDevice(), 1, &m_VRenderFences[imageIndex]);
+
+	VkSemaphore signalSemaphores[] = { m_VRenderFinishedSemaphore };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+	if (vkQueueSubmit(m_VContext->GetGraphicsQueue(), 1, &submitInfo, m_VRenderFences[imageIndex]) != VK_SUCCESS) LUtility::RuntimeError("Failed To Submit Draw Command Buffer.");
+
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+
+	VkSwapchainKHR swapChains[] = { m_VSwapChain };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIndex;
+	presentInfo.pResults = nullptr;
+	vkQueuePresentKHR(m_VContext->GetPresentQueue(), &presentInfo);
+}
+
+void LVForwardPlusRenderCore::Update() {
+	static auto startTime = std::chrono::high_resolution_clock::now();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+	LUtility::UniformBufferObject ubo = {};
+	ubo.model = glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(), time * glm::radians(50.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.proj = glm::perspective(glm::radians(45.0f), m_VSwapChainExtent.width / (float)m_VSwapChainExtent.height, 0.1f, 10000.0f);
+	ubo.proj[1][1] *= -1;
+	ubo.time = time;
+
+	void *data;
+	vkMapMemory(m_VContext->GetDevice(), m_UniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+	memcpy(data, &ubo, sizeof(ubo));
+	vkUnmapMemory(m_VContext->GetDevice(), m_UniformStagingBufferMemory);
+	LUtility::CopyBuffer(m_UniformStagingBuffer, m_UniformBuffer, sizeof(ubo), m_VContext->GetDevice(), m_VContext->GetCommandPool(), m_VContext->GetGraphicsQueue());
+
+}
+
+void LVForwardPlusRenderCore::Cleanup() {
+	vkDeviceWaitIdle(m_VContext->GetDevice());
+	ImGui_ImplGlfwVulkan_Shutdown();
+}
+
+//Initalization Functionality
+//--------------------------------------------------------------------
 void LVForwardPlusRenderCore::CreateSwapChain() {
 	LUtility::SwapChainSupportDetails swapChainSupport = LUtility::QuerySwapChainSupport(m_VContext->GetPhysicalDevice(), m_VContext->GetSurface());
 
@@ -380,6 +472,14 @@ void LVForwardPlusRenderCore::CreateTextureSampler() {
 		LUtility::RuntimeError("Failed To Create Texture Sampler.");
 }
 
+void LVForwardPlusRenderCore::CreateTexture() {
+	LVWrapper<VkImage> stagingImage{ m_VContext->GetDevice(), vkDestroyImage };
+	LVWrapper<VkDeviceMemory> stagingImageMemory{ m_VContext->GetDevice(), vkFreeMemory };
+	LUtility::CreateTextureImage("textures/chalet.jpg", stagingImage, stagingImageMemory, m_TextureImage, m_TextureImageMemory, 
+								m_VContext->GetDevice(), m_VContext->GetPhysicalDevice(), m_VContext->GetGraphicsQueue(), m_VContext->GetCommandPool() );
+	LUtility::CreateTextureImageView(m_TextureImage, m_TextureImageView, m_VContext->GetDevice());
+}
+
 void LVForwardPlusRenderCore::CreateUniformBuffer() {
 
 	VkDeviceSize bufferSize = sizeof(LUtility::UniformBufferObject);
@@ -393,4 +493,222 @@ void LVForwardPlusRenderCore::CreateUniformBuffer() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_UniformBuffer, m_UniformBufferMemory,
 		m_VContext->GetDevice(), m_VContext->GetPhysicalDevice());
+}
+
+void LVForwardPlusRenderCore::CreateVertexBuffer() {
+	VkDeviceSize bufferSize = sizeof(m_Vertices[0]) * m_Vertices.size();
+
+	LVWrapper<VkBuffer>		  stagingBuffer		 { m_VContext->GetDevice(), vkDestroyBuffer };
+	LVWrapper<VkDeviceMemory> stagingBufferMemory{ m_VContext->GetDevice(), vkFreeMemory };
+	LUtility::CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+						   stagingBuffer, stagingBufferMemory,
+						   m_VContext->GetDevice(), m_VContext->GetPhysicalDevice());
+
+	void *data;
+	vkMapMemory(m_VContext->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+		memcpy(data, m_Vertices.data(), (size_t)bufferSize);
+	vkUnmapMemory(m_VContext->GetDevice(), stagingBufferMemory);
+
+	LUtility::CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_VertexBuffer, m_VertexBufferMemory,
+		m_VContext->GetDevice(), m_VContext->GetPhysicalDevice());
+
+	LUtility::CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize,
+						 m_VContext->GetDevice(), m_VContext->GetCommandPool(), m_VContext->GetGraphicsQueue());
+}
+
+void LVForwardPlusRenderCore::CreateIndexBuffer() {
+	VkDeviceSize bufferSize = sizeof(m_Indices[0]) * m_Indices.size();
+
+	LVWrapper<VkBuffer> stagingBuffer{ m_VContext->GetDevice(), vkDestroyBuffer };
+	LVWrapper<VkDeviceMemory> stagingBufferMemory{ m_VContext->GetDevice(), vkFreeMemory };
+	LUtility::CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+							VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							stagingBuffer, stagingBufferMemory,
+							m_VContext->GetDevice(), m_VContext->GetPhysicalDevice());
+	void *data;
+	vkMapMemory(m_VContext->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+		memcpy(data, m_Indices.data(), (size_t)bufferSize);
+	vkUnmapMemory(m_VContext->GetDevice(), stagingBufferMemory);
+
+	LUtility::CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_IndexBuffer, m_IndexBufferMemory,
+		m_VContext->GetDevice(), m_VContext->GetPhysicalDevice());
+
+	LUtility::CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize,
+						m_VContext->GetDevice(), m_VContext->GetCommandPool(), m_VContext->GetGraphicsQueue());
+}
+
+void LVForwardPlusRenderCore::CreateDescriptorPool() {
+	std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = 1;
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[2].descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	poolInfo.pPoolSizes = poolSizes.data();
+	poolInfo.maxSets = 2;
+	if (vkCreateDescriptorPool(m_VContext->GetDevice(), &poolInfo, nullptr, m_VDecriptorPool.Replace()) != VK_SUCCESS)
+		LUtility::RuntimeError("Failed To Create Descriptor Pool.");
+}
+
+void LVForwardPlusRenderCore::CreateDescriptorSet() {
+	VkDescriptorSetLayout layouts[] = { m_VDescriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = m_VDecriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
+	if (vkAllocateDescriptorSets(m_VContext->GetDevice(), &allocInfo, &m_VDescriptorSet) != VK_SUCCESS)
+		LUtility::RuntimeError("Failed To Allocate Descriptor Set.");
+
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = m_UniformBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = sizeof(LUtility::UniformBufferObject);
+
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = m_TextureImageView;
+	imageInfo.sampler =	  m_VTextureSampler;
+
+	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = m_VDescriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[1].dstSet = m_VDescriptorSet;
+	descriptorWrites[1].dstBinding = 1;
+	descriptorWrites[1].dstArrayElement = 0;
+	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[1].descriptorCount = 1;
+	descriptorWrites[1].pImageInfo = &imageInfo;
+
+	vkUpdateDescriptorSets(m_VContext->GetDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
+void LVForwardPlusRenderCore::CreateCommandBuffers() {
+
+	m_VRenderCommandPools.resize(m_VSwapChainFramebuffers.size());
+	m_VCommandBuffers.resize(m_VSwapChainFramebuffers.size());
+	m_VRenderFences.resize(m_VSwapChainFramebuffers.size());
+	for (int i = 0; i < m_VSwapChainFramebuffers.size(); ++i) {
+
+		//Command Pools
+		LUtility::QueueFamilyIndices indices = LUtility::FindQueueIndices(m_VContext->GetPhysicalDevice(), m_VContext->GetSurface());
+
+		VkCommandPoolCreateInfo poolInfo = {};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = indices.graphicsFamily;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+		if (vkCreateCommandPool(m_VContext->GetDevice(), &poolInfo, nullptr, m_VRenderCommandPools[i].Replace()) != VK_SUCCESS)
+			LUtility::RuntimeError("Failed To Create Command Pool.");
+
+		//Command Buffers
+		VkCommandBufferAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = m_VRenderCommandPools[i];
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+		if (vkAllocateCommandBuffers(m_VContext->GetDevice(), &allocInfo, &m_VCommandBuffers[i]) != VK_SUCCESS)
+			LUtility::RuntimeError("Failed To Allocate Command Buffers.");
+
+		//Fences
+		VkFenceCreateInfo fenceInfo = {};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		if (vkCreateFence(m_VContext->GetDevice(), &fenceInfo, nullptr, m_VRenderFences[i].Replace()))
+			LUtility::RuntimeError("Failed To Create Fence.");
+	}
+}
+
+void LVForwardPlusRenderCore::CreateSemaphores() {
+	VkSemaphoreCreateInfo semaphoreInfo = {};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	if (vkCreateSemaphore(m_VContext->GetDevice(), &semaphoreInfo, nullptr, m_VImageAvailableSemaphore.Replace()) != VK_SUCCESS ||
+		vkCreateSemaphore(m_VContext->GetDevice(), &semaphoreInfo, nullptr, m_VRenderFinishedSemaphore.Replace()) != VK_SUCCESS)
+		LUtility::RuntimeError("Failed To Create Semaphores.");
+}
+
+void LVForwardPlusRenderCore::RecordCommandBuffers(int i) {
+
+	vkResetCommandPool(m_VContext->GetDevice(), m_VRenderCommandPools[i], 0);
+
+	//Record Draw Command
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	beginInfo.pInheritanceInfo = nullptr;
+	vkBeginCommandBuffer(m_VCommandBuffers[i], &beginInfo);
+
+	VkRenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = m_VRenderPass;
+	renderPassInfo.framebuffer = m_VSwapChainFramebuffers[i];
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = m_VSwapChainExtent;
+
+	std::array<VkClearValue, 2> clearValues = {};
+	clearValues[0].color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	clearValues[1].depthStencil = { 1.0f, 0 };
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+	vkCmdBeginRenderPass(m_VCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	//GUI
+	//------------------------------------
+	ImGui_ImplGlfwVulkan_NewFrame();
+	ImGui::ShowTestWindow(); //1.) Get Callback working. 2.) Rerecord the command buffers.
+	//------------------------------------
+
+
+	vkCmdBindPipeline(m_VCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_VGraphicsPipeline);
+	VkBuffer vertexBuffers[] = { m_VertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(m_VCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+	vkCmdBindIndexBuffer(m_VCommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+	vkCmdBindDescriptorSets(m_VCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_VGraphicsPipelineLayout, 0, 1, &m_VDescriptorSet, 0, nullptr);
+	vkCmdDrawIndexed(m_VCommandBuffers[i], static_cast<uint32_t>(m_Indices.size()), 1, 0, 0, 0);
+
+	//GUI
+	//-------------------------------------
+	ImGui_ImplGlfwVulkan_Render(m_VCommandBuffers[i]);
+	//-------------------------------------
+
+	vkCmdEndRenderPass(m_VCommandBuffers[i]);
+	if (vkEndCommandBuffer(m_VCommandBuffers[i]) != VK_SUCCESS)	LUtility::RuntimeError("Failed To Record Command Buffer.");
+}
+
+void LVForwardPlusRenderCore::BindGUI() {
+	ImGui_ImplGlfwVulkan_Init_Data init = {};
+	init.allocator = nullptr;
+	init.gpu = m_VContext->GetPhysicalDevice();
+	init.device = m_VContext->GetDevice();
+	init.render_pass = m_VRenderPass;
+	init.pipeline_cache = VK_NULL_HANDLE;
+	init.descriptor_pool = m_VDecriptorPool;
+	init.check_vk_result = nullptr;
+	ImGui_ImplGlfwVulkan_Init(m_VContext->GetWindowHandle(), true, &init);
+
+	VkCommandBuffer commandBuffer = LUtility::BeginSingleTimeCommands(m_VContext->GetCommandPool(), m_VContext->GetDevice());
+	ImGui_ImplGlfwVulkan_CreateFontsTexture(commandBuffer);
+	LUtility::EndSingleTimeCommands(commandBuffer, m_VContext->GetGraphicsQueue(), m_VContext->GetCommandPool(), m_VContext->GetDevice());
+	ImGui_ImplGlfwVulkan_InvalidateFontUploadObjects();
 }

@@ -7,7 +7,7 @@ public:
 	LWindow(unsigned int _width, unsigned int _height, const char *_title);
 	~LWindow();
 
-	bool ShouldClose();
+	int ShouldClose();
 	void PollEvents();
 	void Close();
 

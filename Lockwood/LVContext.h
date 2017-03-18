@@ -17,12 +17,13 @@ public:
 
 	//Vulkan Context Handle Getter Interface
 	//-----------------------------------------------------------------------------
-	inline const LVWrapper<VkDevice>&	GetDevice()		    const { return m_VDevice; }
-	inline VkSurfaceKHR     GetSurface()        const { return m_VSurface;  }
-	inline VkPhysicalDevice GetPhysicalDevice() const { return m_VPhysicalDevice; }
-	inline VkCommandPool	GetCommandPool()	const { return m_VCommandPool; }
-	inline VkQueue			GetGraphicsQueue()  const { return m_VGraphicsQueue; }
-	inline VkQueue			GetPresentQueue()	const { return m_VPresentQueue; }
+	inline GLFWwindow*						  GetWindowHandle()			  { return m_glfwWindowHandle; }
+	inline const LVWrapper<VkDevice>&		  GetDevice()		    const { return m_VDevice; }
+	inline const LVWrapper<VkSurfaceKHR>&     GetSurface()          const { return m_VSurface;  }
+	inline const VkPhysicalDevice&			  GetPhysicalDevice()   const { return m_VPhysicalDevice; }
+	inline const LVWrapper<VkCommandPool>&	  GetCommandPool()	    const { return m_VCommandPool; }
+	inline const VkQueue&		              GetGraphicsQueue()    const { return m_VGraphicsQueue; }
+	inline const VkQueue&		  			  GetPresentQueue()	    const { return m_VPresentQueue; }
 	//-----------------------------------------------------------------------------
 
 private:

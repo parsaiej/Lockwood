@@ -161,7 +161,7 @@ void LVContext::CreateCommandPool() {
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.queueFamilyIndex = indices.graphicsFamily;
 	poolInfo.flags = 0;
-
+	
 	if (vkCreateCommandPool(m_VDevice, &poolInfo, nullptr, m_VCommandPool.Replace()) != VK_SUCCESS)
 		LUtility::RuntimeError("Failed To Create Command Pool.");
 }

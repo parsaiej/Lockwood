@@ -1,7 +1,5 @@
 #pragma once
 
-#include <GLFW\glfw3.h>
-
 #include <memory>
 
 class LWindow;
@@ -14,7 +12,8 @@ public:
 
 	void Initialize(int argc, const char *argv[]);
 	void Run();
-	void Update();
+	void OnGUI();
+	void Update(float _dt);
 
 private:
 	std::unique_ptr<LWindow>				 m_Window;

@@ -19,7 +19,7 @@ LWindow::~LWindow() {
 
 }
 
-bool LWindow::ShouldClose() {
+int LWindow::ShouldClose() {
 	return glfwWindowShouldClose(m_glfwWindow);
 }
 
