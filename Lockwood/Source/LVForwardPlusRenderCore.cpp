@@ -51,6 +51,10 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	this->BindGUI();
 	this->CreateCommandBuffers();		LUtility::Log("Command Buffers Recorded.");
 	this->CreateSemaphores();			LUtility::Log("Semaphores Created.");
+
+	m_ClearR = 0.0f;
+	m_ClearG = 0.0f;
+	m_ClearB = 0.0f;
 }
 
 LVForwardPlusRenderCore::~LVForwardPlusRenderCore() {}
@@ -124,6 +128,10 @@ void LVForwardPlusRenderCore::Cleanup() {
 
 void LVForwardPlusRenderCore::RegisterCallbackGUI(std::function<void()> _callback) {
 	m_GuiCallback = _callback;
+}
+
+void LVForwardPlusRenderCore::SetClearColor(float _r, float _g, float _b) {
+	m_ClearR = _r; m_ClearG = _g; m_ClearB = _b;
 }
 
 //Initalization Functionality
@@ -670,7 +678,7 @@ void LVForwardPlusRenderCore::RecordCommandBuffers(int i) {
 	renderPassInfo.renderArea.extent = m_VSwapChainExtent;
 
 	std::array<VkClearValue, 2> clearValues = {};
-	clearValues[0].color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	clearValues[0].color = { m_ClearR, m_ClearG, m_ClearB, 1.0f };
 	clearValues[1].depthStencil = { 1.0f, 0 };
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 	renderPassInfo.pClearValues = clearValues.data();

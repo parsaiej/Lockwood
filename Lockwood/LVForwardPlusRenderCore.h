@@ -25,6 +25,7 @@ public:
 	void Cleanup();
 
 	void RegisterCallbackGUI(std::function<void()> _callback);
+	void SetClearColor(float _r, float _g, float _b);
 
 private:
 	std::unique_ptr<LVContext> m_VContext;
@@ -90,4 +91,9 @@ private:
 
 	void RecordCommandBuffers(int i);
 	void BindGUI();
+
+	//Temp
+	float m_ClearR;
+	float m_ClearG;
+	float m_ClearB;
 };

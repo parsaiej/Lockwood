@@ -14,7 +14,11 @@ LApplication::LApplication()
 	: m_Window(std::make_unique<LWindow>(SCREEN_WIDTH, SCREEN_HEIGHT, "Lockwood")),
 	  m_Renderer(std::make_unique<LVForwardPlusRenderCore>(m_Window->GetHandle()))
 {
-	m_TestFloat = 0.0f;
+	//For demonstration purposes we modify the renderer's clear color
+	//through the GUI interface.
+	m_ClearR = 1.0f;
+	m_ClearG = 0.819f;
+	m_ClearB = 0.604f;
 }
 
 LApplication::~LApplication()
@@ -29,8 +33,8 @@ void LApplication::OnGUI() {
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
 
-	ImGui::Begin("Some Other Window");
-	ImGui::SliderFloat("float", &m_TestFloat, 0.0f, 1.0f);
+	ImGui::Begin("Clear Color");
+	ImGui::SliderFloat3("float", &m_ClearR, 0.0f, 1.0f);
 	ImGui::End();
 }
 
@@ -62,5 +66,6 @@ void LApplication::Run() {
 }
 
 void LApplication::Update(float _dt) {
+	m_Renderer->SetClearColor(m_ClearR, m_ClearG, m_ClearB);
 	m_Renderer->Update();
 }
