@@ -36,6 +36,8 @@ void LApplication::OnGUI() {
 	ImGui::Begin("Clear Color");
 	ImGui::SliderFloat3("float", &m_ClearR, 0.0f, 1.0f);
 	ImGui::End();
+
+	ImGui::ShowTestWindow();
 }
 
 void LApplication::Run() {
