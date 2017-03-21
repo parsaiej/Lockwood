@@ -21,6 +21,9 @@
 #include <glm\gtx\hash.hpp>
 
 namespace LUtility {
+	const int ScreenWidth = 1280;
+	const int ScreenHeight = 720;
+	const glm::vec3 WorldUp = glm::vec3(0, 1, 0);
 
 	const std::vector<const char*> VulkanExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME

@@ -7,11 +7,8 @@
 
 #include <imgui.h>
 
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 720
-
 LApplication::LApplication()
-	: m_Window(std::make_unique<LWindow>(SCREEN_WIDTH, SCREEN_HEIGHT, "Lockwood")),
+	: m_Window(std::make_unique<LWindow>(LUtility::ScreenWidth, LUtility::ScreenHeight, "Lockwood")),
 	  m_Renderer(std::make_unique<LVForwardPlusRenderCore>(m_Window->GetHandle()))
 {
 	//For demonstration purposes we modify the renderer's clear color
@@ -69,5 +66,4 @@ void LApplication::Run() {
 
 void LApplication::Update(float _dt) {
 	m_Renderer->SetClearColor(m_ClearR, m_ClearG, m_ClearB);
-	m_Renderer->Update();
 }

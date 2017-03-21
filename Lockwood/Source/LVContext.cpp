@@ -103,7 +103,6 @@ void LVContext::PickPhysicalDevice() {
 
 	std::vector<VkPhysicalDevice> devices(deviceCount);
 	vkEnumeratePhysicalDevices(m_VInstance, &deviceCount, devices.data());
-
 	for (const auto& device : devices) {
 		if (LUtility::IsDeviceSuitable(device, m_VSurface)) {
 			m_VPhysicalDevice = device;
@@ -111,6 +110,10 @@ void LVContext::PickPhysicalDevice() {
 		}
 	}
 	if (m_VPhysicalDevice == VK_NULL_HANDLE) LUtility::RuntimeError("Failed To Find Suitable GPU.");
+
+	VkPhysicalDeviceProperties prop;
+	vkGetPhysicalDeviceProperties(m_VPhysicalDevice, &prop);
+	LUtility::Log(prop.deviceName);
 }
 
 void LVContext::CreateLogicalDevice() {

@@ -61,6 +61,7 @@ LVForwardPlusRenderCore::~LVForwardPlusRenderCore() {}
 
 
 void LVForwardPlusRenderCore::Draw() {
+	UpdateUniformBuffer();
 
 	uint32_t imageIndex;
 	vkAcquireNextImageKHR(m_VContext->GetDevice(), m_VSwapChain, std::numeric_limits<uint64_t>::max(), m_VImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
@@ -101,7 +102,7 @@ void LVForwardPlusRenderCore::Draw() {
 	vkQueuePresentKHR(m_VContext->GetPresentQueue(), &presentInfo);
 }
 
-void LVForwardPlusRenderCore::Update() {
+void LVForwardPlusRenderCore::UpdateUniformBuffer() {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
@@ -560,7 +561,7 @@ void LVForwardPlusRenderCore::CreateDescriptorPool() {
 	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[1].descriptorCount = 1;
-	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; //Note: Need Extra Combined Image Sampler for IMGUI
 	poolSizes[2].descriptorCount = 1;
 
 	VkDescriptorPoolCreateInfo poolInfo = {};
@@ -616,9 +617,9 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 
 void LVForwardPlusRenderCore::CreateCommandBuffers() {
 
-	m_VRenderCommandPools.resize(m_VSwapChainFramebuffers.size());
+	m_VRenderCommandPools.resize(m_VSwapChainFramebuffers.size(), LVWrapper<VkCommandPool>{ m_VContext->GetDevice(), vkDestroyCommandPool });
 	m_VCommandBuffers.resize(m_VSwapChainFramebuffers.size());
-	m_VRenderFences.resize(m_VSwapChainFramebuffers.size());
+	m_VRenderFences.resize(m_VSwapChainFramebuffers.size(), LVWrapper<VkFence>{ m_VContext->GetDevice(), vkDestroyFence });
 	for (int i = 0; i < m_VSwapChainFramebuffers.size(); ++i) {
 
 		//Command Pools

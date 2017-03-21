@@ -21,7 +21,7 @@ public:
 	~LVForwardPlusRenderCore();
 
 	void Draw();
-	void Update();
+	void UpdateUniformBuffer();
 	void Cleanup();
 
 	void RegisterCallbackGUI(std::function<void()> _callback);
