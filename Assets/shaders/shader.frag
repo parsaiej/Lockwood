@@ -8,6 +8,7 @@ layout(binding = 4) uniform sampler2D sampler3;
 
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 tangentToWorld[3];
+layout(location = 4) in vec3 eyeDir;
 
 layout(location = 0) out vec4 outColor;
 
@@ -37,12 +38,17 @@ vec3 PerPixelWorldNormal(vec2 uv, vec3 tangentToWorld[3]){
 }
 
 void main() {
-
 	vec3 normal = PerPixelWorldNormal(fragTexCoord, tangentToWorld);
 	float nl = max(dot(normal, vec3(0, 1, 0)), 0.0);
 
-	vec3 a = texture(sampler1, fragTexCoord).rgb;
+	vec3   a = texture(sampler1, fragTexCoord).rgb;
+	float rg = texture(sampler2, fragTexCoord).r;
 	float ao = texture(sampler3, fragTexCoord).r;
 	
-    outColor = vec4((a * nl * ao), 1.0);
+	
+	//calculate specular
+	vec3 h = normalize(vec3(0, 1, 0) + -eyeDir);
+	float nh = pow(max(dot(h, normal), 0.0), rg * 1000.0);
+	
+    outColor = vec4((a*(nl+(ao*0.25))) + (0.5*vec3(nh)), 1.0);
 }

@@ -16,6 +16,8 @@ LApplication::LApplication()
 	m_ClearR = 1.0f;
 	m_ClearG = 1.0f;
 	m_ClearB = 1.0f;
+	m_TextureSet = 0;
+	m_HeightMag = 0.1f;
 }
 
 LApplication::~LApplication()
@@ -26,15 +28,12 @@ void LApplication::Initialize(int argc, const char *argv[]) {
 }
 
 void LApplication::OnGUI() {
-	ImGui::Begin("Application Metrics");
+	ImGui::Begin("Application");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::SliderFloat3("Background", &m_ClearR, 0.0f, 1.0f);
+	ImGui::SliderInt("Texture Set", &m_TextureSet, 0, 5);
+	ImGui::SliderFloat("Displacement", &m_HeightMag, 0.0f, 1.0f);
 	ImGui::End();
-
-	ImGui::Begin("Clear Color");
-	ImGui::SliderFloat3("float", &m_ClearR, 0.0f, 1.0f);
-	ImGui::End();
-
-	ImGui::ShowTestWindow();
 }
 
 void LApplication::Run() {
@@ -66,4 +65,6 @@ void LApplication::Run() {
 
 void LApplication::Update(float _dt) {
 	m_Renderer->SetClearColor(m_ClearR, m_ClearG, m_ClearB);
+	m_Renderer->UpdateTextureSet(m_TextureSet);
+	m_Renderer->SetHeightMagnitude(m_HeightMag);
 }

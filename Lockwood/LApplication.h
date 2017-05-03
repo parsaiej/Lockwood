@@ -23,4 +23,6 @@ private:
 	float m_ClearR;
 	float m_ClearG;
 	float m_ClearB;
+	int m_TextureSet;
+	float m_HeightMag;
 };

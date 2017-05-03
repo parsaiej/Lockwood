@@ -23,9 +23,11 @@ public:
 	void Draw();
 	void UpdateUniformBuffer();
 	void Cleanup();
+	void UpdateTextureSet(int set);
 
 	void RegisterCallbackGUI(std::function<void()> _callback);
 	void SetClearColor(float _r, float _g, float _b);
+	void SetHeightMagnitude(float _mag);
 
 private:
 	std::unique_ptr<LVContext> m_VContext;
@@ -85,15 +87,19 @@ private:
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();
 	void CreateDescriptorPool();
-	void CreateDescriptorSet();
+	void CreateDescriptorSet(int _textureSet);
 	void CreateCommandBuffers();
 	void CreateSemaphores();
 
-	void RecordCommandBuffers(int i);
+	void RecordCommandBuffers(int _i);
 	void BindGUI();
+	
+	void UpdateTextureDescriptorSet(int _textureSet);
 
 	//Temp
 	float m_ClearR;
 	float m_ClearG;
 	float m_ClearB;
+	int m_TextureSet;
+	float m_HeightMag;
 };

@@ -24,7 +24,7 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	m_IndexBufferMemory			  { m_VContext->GetDevice(), vkFreeMemory },
 
 	//m_TextureImage				  { m_VContext->GetDevice(), vkDestroyImage },
-	//m_TextureImageMemory		  { m_VContext->GetDevice(), vkFreeMemory },
+	//m_TextureImageMemory		      { m_VContext->GetDevice(), vkFreeMemory },
 	//m_TextureImageView			  { m_VContext->GetDevice(), vkDestroyImageView },
 
 	m_VDecriptorPool			  { m_VContext->GetDevice(), vkDestroyDescriptorPool },
@@ -47,17 +47,49 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	this->CreateVertexBuffer();
 	this->CreateIndexBuffer();
 
-	m_TextureImages.resize(4, LVWrapper<VkImage>{m_VContext->GetDevice(), vkDestroyImage});
-	m_TextureImageMemories.resize(4, LVWrapper<VkDeviceMemory>{m_VContext->GetDevice(), vkFreeMemory});
-	m_TextureImageViews.resize(4, LVWrapper<VkImageView>{m_VContext->GetDevice(), vkDestroyImageView});
-	this->CreateTexture("../Assets/textures/sphere/whiteTile/normals.png", 0);	
-	this->CreateTexture("../Assets/textures/sphere/whiteTile/diffuse.png", 1);
-	this->CreateTexture("../Assets/textures/sphere/whiteTile/specular.png", 2);
-	this->CreateTexture("../Assets/textures/sphere/whiteTile/ao.png",  3);
+	m_TextureSet = 0;
+	m_TextureImages.       resize(30, LVWrapper<VkImage>       {m_VContext->GetDevice(), vkDestroyImage});
+	m_TextureImageMemories.resize(30, LVWrapper<VkDeviceMemory>{m_VContext->GetDevice(), vkFreeMemory});
+	m_TextureImageViews.   resize(30, LVWrapper<VkImageView>   {m_VContext->GetDevice(), vkDestroyImageView});
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/normals.png",    0);	
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/diffuse.png",    1);
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/specular.png",   2);
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/ao.png",         3);
+	this->CreateTexture("../Assets/textures/sphere/noHeight.png",	  4);
+
+	this->CreateTexture("../Assets/textures/sphere/brickCinder/normals.png",  5);
+	this->CreateTexture("../Assets/textures/sphere/brickCinder/diffuse.png",  6);
+	this->CreateTexture("../Assets/textures/sphere/brickCinder/specular.png", 7);
+	this->CreateTexture("../Assets/textures/sphere/brickCinder/ao.png",		  8);
+	this->CreateTexture("../Assets/textures/sphere/noHeight.png",      9);
+
+	this->CreateTexture("../Assets/textures/sphere/brickBaked/normals.png",   10);
+	this->CreateTexture("../Assets/textures/sphere/brickBaked/diffuse.png",   11);
+	this->CreateTexture("../Assets/textures/sphere/brickBaked/specular.png",  12);
+	this->CreateTexture("../Assets/textures/sphere/brickBaked/ao.png",        13);
+	this->CreateTexture("../Assets/textures/sphere/noHeight.png",	  14);
+
+	this->CreateTexture("../Assets/textures/sphere/blackTile/normals.jpg",    15);
+	this->CreateTexture("../Assets/textures/sphere/blackTile/diffuse.jpg",    16);
+	this->CreateTexture("../Assets/textures/sphere/blackTile/specular.jpg",   17);
+	this->CreateTexture("../Assets/textures/sphere/blackTile/ao.jpg",         18);
+	this->CreateTexture("../Assets/textures/sphere/noHeight.png",	  19);
+
+	this->CreateTexture("../Assets/textures/sphere/wood/normals.jpg",         20);
+	this->CreateTexture("../Assets/textures/sphere/wood/diffuse.jpg",         21);
+	this->CreateTexture("../Assets/textures/sphere/wood/specular.jpg",        22);
+	this->CreateTexture("../Assets/textures/sphere/wood/ao.jpg",              23);
+	this->CreateTexture("../Assets/textures/sphere/noHeight.png",	  24);
+
+	this->CreateTexture("../Assets/textures/sphere/brickRed/normals.jpg",     25);
+	this->CreateTexture("../Assets/textures/sphere/brickRed/diffuse.jpg",     26);
+	this->CreateTexture("../Assets/textures/sphere/brickRed/specular.jpg",    27);
+	this->CreateTexture("../Assets/textures/sphere/brickRed/ao.jpg",          28);
+	this->CreateTexture("../Assets/textures/sphere/brickRed/height.jpg",	  29);
 	LUtility::Log("Media Loaded.");
 
 	this->CreateDescriptorPool();		LUtility::Log("Descriptor Pool Created");
-	this->CreateDescriptorSet();		LUtility::Log("Descriptor Set Created.");
+	this->CreateDescriptorSet(0);		LUtility::Log("Descriptor Set Created.");
 	this->BindGUI();
 	this->CreateCommandBuffers();		LUtility::Log("Command Buffers Recorded.");
 	this->CreateSemaphores();			LUtility::Log("Semaphores Created.");
@@ -122,7 +154,7 @@ void LVForwardPlusRenderCore::UpdateUniformBuffer() {
 	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.proj = glm::perspective(glm::radians(45.0f), m_VSwapChainExtent.width / (float)m_VSwapChainExtent.height, 0.1f, 10000.0f);
 	ubo.proj[1][1] *= -1;
-	ubo.time = time;
+	ubo.time = m_HeightMag;
 
 	void *data;
 	vkMapMemory(m_VContext->GetDevice(), m_UniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
@@ -143,6 +175,15 @@ void LVForwardPlusRenderCore::RegisterCallbackGUI(std::function<void()> _callbac
 
 void LVForwardPlusRenderCore::SetClearColor(float _r, float _g, float _b) {
 	m_ClearR = _r; m_ClearG = _g; m_ClearB = _b;
+}
+
+void LVForwardPlusRenderCore::UpdateTextureSet(int _set) {
+	vkDeviceWaitIdle(m_VContext->GetDevice());
+	this->UpdateTextureDescriptorSet(_set);
+}
+
+void LVForwardPlusRenderCore::SetHeightMagnitude(float _mag) {
+	m_HeightMag = _mag;
 }
 
 //Initalization Functionality
@@ -550,7 +591,7 @@ void LVForwardPlusRenderCore::CreateDescriptorPool() {
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 4;
+	poolSizes[1].descriptorCount = 5;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; //Note: Need Extra Combined Image Sampler for IMGUI
 	poolSizes[2].descriptorCount = 1;
 
@@ -601,7 +642,14 @@ void LVForwardPlusRenderCore::CreateDescriptorSetLayout() {
 	sampler3.pImmutableSamplers = nullptr;
 	sampler3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 5> bindings = { uboLayoutBinding, sampler0, sampler1, sampler2, sampler3 };
+	VkDescriptorSetLayoutBinding sampler4 = {};
+	sampler4.binding = 5;
+	sampler4.descriptorCount = 1;
+	sampler4.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler4.pImmutableSamplers = nullptr;
+	sampler4.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	std::array<VkDescriptorSetLayoutBinding, 6> bindings = { uboLayoutBinding, sampler0, sampler1, sampler2, sampler3, sampler4 };
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -610,7 +658,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSetLayout() {
 		LUtility::RuntimeError("Failed To Create Descriptor Set Layout.");
 }
 
-void LVForwardPlusRenderCore::CreateDescriptorSet() {
+void LVForwardPlusRenderCore::CreateDescriptorSet(int textureSet) {
 	VkDescriptorSetLayout layouts[] = { m_VDescriptorSetLayout };
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -625,7 +673,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	bufferInfo.offset = 0;
 	bufferInfo.range = sizeof(LUtility::UniformBufferObject);
 
-	std::array<VkWriteDescriptorSet, 5> descriptorWrites = {};
+	std::array<VkWriteDescriptorSet, 6> descriptorWrites = {};
 
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = m_VDescriptorSet;
@@ -638,7 +686,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	//Texture 0
 	VkDescriptorImageInfo imageInfo = {};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = m_TextureImageViews[0];
+	imageInfo.imageView = m_TextureImageViews[0 + (5 * textureSet)];
 	imageInfo.sampler = m_VTextureSampler;
 
 	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -652,7 +700,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	//Texture 1
 	VkDescriptorImageInfo image1Info = {};
 	image1Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	image1Info.imageView = m_TextureImageViews[1];
+	image1Info.imageView = m_TextureImageViews[1 + (5 * textureSet)];
 	image1Info.sampler   = m_VTextureSampler;
 	
 	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -666,7 +714,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	//Texture 2
 	VkDescriptorImageInfo image2Info = {};
 	image2Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	image2Info.imageView = m_TextureImageViews[2];
+	image2Info.imageView = m_TextureImageViews[2 + (5 * textureSet)];
 	image2Info.sampler = m_VTextureSampler;
 
 	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -677,10 +725,10 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	descriptorWrites[3].descriptorCount = 1;
 	descriptorWrites[3].pImageInfo = &image2Info;
 
-	//Texture 2
+	//Texture 3
 	VkDescriptorImageInfo image3Info = {};
 	image3Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	image3Info.imageView = m_TextureImageViews[3]; //<TODO: Update!!
+	image3Info.imageView = m_TextureImageViews[3 + (5 * textureSet)]; 
 	image3Info.sampler = m_VTextureSampler;
 
 	descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -690,9 +738,114 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descriptorWrites[4].descriptorCount = 1;
 	descriptorWrites[4].pImageInfo = &image3Info;
+
+	//Texture 4
+	VkDescriptorImageInfo image4Info = {};
+	image4Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image4Info.imageView = m_TextureImageViews[4 + (5 * textureSet)];
+	image4Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[5].dstSet = m_VDescriptorSet;
+	descriptorWrites[5].dstBinding = 5;
+	descriptorWrites[5].dstArrayElement = 0;
+	descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[5].descriptorCount = 1;
+	descriptorWrites[5].pImageInfo = &image4Info;
 	
 	vkUpdateDescriptorSets(m_VContext->GetDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
+
+void LVForwardPlusRenderCore::UpdateTextureDescriptorSet(int _set) {
+
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = m_UniformBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = sizeof(LUtility::UniformBufferObject);
+
+	std::array<VkWriteDescriptorSet, 6> descriptorWrites = {};
+
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = m_VDescriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+	//Texture 0
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = m_TextureImageViews[0 + (5 * _set)];
+	imageInfo.sampler = m_VTextureSampler;
+
+	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[1].dstSet = m_VDescriptorSet;
+	descriptorWrites[1].dstBinding = 1;
+	descriptorWrites[1].dstArrayElement = 0;
+	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[1].descriptorCount = 1;
+	descriptorWrites[1].pImageInfo = &imageInfo;
+
+	//Texture 1
+	VkDescriptorImageInfo image1Info = {};
+	image1Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image1Info.imageView = m_TextureImageViews[1 + (5 * _set)];
+	image1Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[2].dstSet = m_VDescriptorSet;
+	descriptorWrites[2].dstBinding = 2;
+	descriptorWrites[2].dstArrayElement = 0;
+	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[2].descriptorCount = 1;
+	descriptorWrites[2].pImageInfo = &image1Info;
+
+	//Texture 2
+	VkDescriptorImageInfo image2Info = {};
+	image2Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image2Info.imageView = m_TextureImageViews[2 + (5 * _set)];
+	image2Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[3].dstSet = m_VDescriptorSet;
+	descriptorWrites[3].dstBinding = 3;
+	descriptorWrites[3].dstArrayElement = 0;
+	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[3].descriptorCount = 1;
+	descriptorWrites[3].pImageInfo = &image2Info;
+
+	//Texture 3
+	VkDescriptorImageInfo image3Info = {};
+	image3Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image3Info.imageView = m_TextureImageViews[3 + (5 * _set)];
+	image3Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[4].dstSet = m_VDescriptorSet;
+	descriptorWrites[4].dstBinding = 4;
+	descriptorWrites[4].dstArrayElement = 0;
+	descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[4].descriptorCount = 1;
+	descriptorWrites[4].pImageInfo = &image3Info;
+
+	//Texture 4
+	VkDescriptorImageInfo image4Info = {};
+	image4Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image4Info.imageView = m_TextureImageViews[4 + (5 * _set)];
+	image4Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[5].dstSet = m_VDescriptorSet;
+	descriptorWrites[5].dstBinding = 5;
+	descriptorWrites[5].dstArrayElement = 0;
+	descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[5].descriptorCount = 1;
+	descriptorWrites[5].pImageInfo = &image4Info;
+
+	vkUpdateDescriptorSets(m_VContext->GetDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
 
 void LVForwardPlusRenderCore::CreateCommandBuffers() {
 
