@@ -227,6 +227,8 @@ bool LUtility::CheckValidationLayerSupport() {
 	return true;
 }
 
+#define L_PI 3.14159265359f
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 void LUtility::LoadModel(const std::string &_filePath, std::vector<Vertex> &_vertices, std::vector<uint32_t> &_indices) {
@@ -244,17 +246,30 @@ void LUtility::LoadModel(const std::string &_filePath, std::vector<Vertex> &_ver
 			Vertex vertex = {};
 
 			vertex.position = {
-				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 0], 
 				attrib.vertices[3 * index.vertex_index + 1],
 				attrib.vertices[3 * index.vertex_index + 2]
 			};
+			
+			vertex.color = {
+				attrib.normals[3 * index.normal_index + 0],
+				attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 2],
+			};
+
+			glm::vec3 t;
+			if (glm::dot(glm::vec3(0, 1, 0), vertex.color) == 1.0f) t = glm::vec3(1, 0, 0);
+			else {
+				t = glm::cross(glm::vec3(0, 1, 0), vertex.color);
+				t = glm::normalize(t);
+			}
+			vertex.tangent = t;
 
 			vertex.texCoord = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
 				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
-			vertex.color = { 1.0f, 1.0f, 1.0f };
 
 			if (uniqueVertices.count(vertex) == 0) {
 				uniqueVertices[vertex] = (int)_vertices.size();
@@ -265,6 +280,8 @@ void LUtility::LoadModel(const std::string &_filePath, std::vector<Vertex> &_ver
 			_indices.push_back(uniqueVertices[vertex]);
 		}
 	}
+
+	//TODO: https://www.opengl.org/discussion_boards/showthread.php/199234-Generating-tangents-bitangents-for-triangle-strip-sphere
 
 }
 

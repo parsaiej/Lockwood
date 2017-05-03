@@ -64,9 +64,9 @@ private:
 	LVWrapper<VkDeviceMemory>				  m_VDepthImageMemory;
 	LVWrapper<VkImageView>					  m_VDepthImageView;
 
-	LVWrapper<VkImage>						  m_TextureImage;
-	LVWrapper<VkDeviceMemory>				  m_TextureImageMemory;
-	LVWrapper<VkImageView>					  m_TextureImageView;
+	std::vector<LVWrapper<VkImage>>						  m_TextureImages;
+	std::vector<LVWrapper<VkDeviceMemory>>		          m_TextureImageMemories;
+	std::vector<LVWrapper<VkImageView>>					  m_TextureImageViews;
 
 	//We support only one batch of geometry as of now.
 	std::vector<LUtility::Vertex>			  m_Vertices;
@@ -80,7 +80,7 @@ private:
 	void CreateDepthResources();
 	void CreateFramebuffers();
 	void CreateTextureSampler();
-	void CreateTexture();
+	void CreateTexture(const std::string& _path, int _i);
 	void CreateUniformBuffer();
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();

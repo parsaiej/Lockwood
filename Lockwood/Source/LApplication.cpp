@@ -14,8 +14,8 @@ LApplication::LApplication()
 	//For demonstration purposes we modify the renderer's clear color
 	//through the GUI interface.
 	m_ClearR = 1.0f;
-	m_ClearG = 0.819f;
-	m_ClearB = 0.604f;
+	m_ClearG = 1.0f;
+	m_ClearB = 1.0f;
 }
 
 LApplication::~LApplication()

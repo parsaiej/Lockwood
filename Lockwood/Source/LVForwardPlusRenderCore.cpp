@@ -22,9 +22,11 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	m_VertexBufferMemory		  { m_VContext->GetDevice(), vkFreeMemory },
 	m_IndexBuffer				  { m_VContext->GetDevice(), vkDestroyBuffer },
 	m_IndexBufferMemory			  { m_VContext->GetDevice(), vkFreeMemory },
-	m_TextureImage				  { m_VContext->GetDevice(), vkDestroyImage },
-	m_TextureImageMemory		  { m_VContext->GetDevice(), vkFreeMemory },
-	m_TextureImageView			  { m_VContext->GetDevice(), vkDestroyImageView },
+
+	//m_TextureImage				  { m_VContext->GetDevice(), vkDestroyImage },
+	//m_TextureImageMemory		  { m_VContext->GetDevice(), vkFreeMemory },
+	//m_TextureImageView			  { m_VContext->GetDevice(), vkDestroyImageView },
+
 	m_VDecriptorPool			  { m_VContext->GetDevice(), vkDestroyDescriptorPool },
 	m_VDescriptorSet(VK_NULL_HANDLE),
 	m_VImageAvailableSemaphore	  { m_VContext->GetDevice(), vkDestroySemaphore },
@@ -41,10 +43,18 @@ LVForwardPlusRenderCore::LVForwardPlusRenderCore(GLFWwindow *_window)
 	this->CreateTextureSampler();		LUtility::Log("Texture Sampler Created.");
 	this->CreateUniformBuffer();		LUtility::Log("UBO Created.");
 
-	LUtility::LoadModel("models/chalet.obj", m_Vertices, m_Indices);
+	LUtility::LoadModel("../Assets/models/Sphere.obj", m_Vertices, m_Indices);
 	this->CreateVertexBuffer();
 	this->CreateIndexBuffer();
-	this->CreateTexture();				LUtility::Log("Media Loaded.");
+
+	m_TextureImages.resize(4, LVWrapper<VkImage>{m_VContext->GetDevice(), vkDestroyImage});
+	m_TextureImageMemories.resize(4, LVWrapper<VkDeviceMemory>{m_VContext->GetDevice(), vkFreeMemory});
+	m_TextureImageViews.resize(4, LVWrapper<VkImageView>{m_VContext->GetDevice(), vkDestroyImageView});
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/normals.png", 0);	
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/diffuse.png", 1);
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/specular.png", 2);
+	this->CreateTexture("../Assets/textures/sphere/whiteTile/ao.png",  3);
+	LUtility::Log("Media Loaded.");
 
 	this->CreateDescriptorPool();		LUtility::Log("Descriptor Pool Created");
 	this->CreateDescriptorSet();		LUtility::Log("Descriptor Set Created.");
@@ -108,8 +118,8 @@ void LVForwardPlusRenderCore::UpdateUniformBuffer() {
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
 
 	LUtility::UniformBufferObject ubo = {};
-	ubo.model = glm::translate(glm::mat4(), glm::vec3(-0.6f, 0.8f, 0.0f)) * glm::rotate(glm::mat4(), time * glm::radians(50.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.model = glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(), time * glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.proj = glm::perspective(glm::radians(45.0f), m_VSwapChainExtent.width / (float)m_VSwapChainExtent.height, 0.1f, 10000.0f);
 	ubo.proj[1][1] *= -1;
 	ubo.time = time;
@@ -259,33 +269,9 @@ void LVForwardPlusRenderCore::CreateRenderPasses() {
 		LUtility::RuntimeError("Failed To Create Render Pass.");
 }
 
-void LVForwardPlusRenderCore::CreateDescriptorSetLayout() {
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 1;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-	uboLayoutBinding.binding = 0;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	uboLayoutBinding.pImmutableSamplers = nullptr;
-
-	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-	layoutInfo.pBindings = bindings.data();
-	if (vkCreateDescriptorSetLayout(m_VContext->GetDevice(), &layoutInfo, nullptr, m_VDescriptorSetLayout.Replace()) != VK_SUCCESS)
-		LUtility::RuntimeError("Failed To Create Descriptor Set Layout.");
-}
-
 void LVForwardPlusRenderCore::CreateGraphicsPipeline() {
-	auto vertShaderCode = LUtility::ReadFile("shaders/vert.spv");
-	auto fragShaderCode = LUtility::ReadFile("shaders/frag.spv");
+	auto vertShaderCode = LUtility::ReadFile("../Assets/shaders/vert.spv");
+	auto fragShaderCode = LUtility::ReadFile("../Assets/shaders/frag.spv");
 
 	LVWrapper<VkShaderModule> vertShaderModule{ m_VContext->GetDevice(), vkDestroyShaderModule };
 	LVWrapper<VkShaderModule> fragShaderModule{ m_VContext->GetDevice(), vkDestroyShaderModule };
@@ -429,6 +415,7 @@ void LVForwardPlusRenderCore::CreateGraphicsPipeline() {
 
 void LVForwardPlusRenderCore::CreateDepthResources() {
 	VkFormat depthFormat = LUtility::FindDepthFormat(m_VContext->GetPhysicalDevice());
+
 	LUtility::CreateImage(m_VSwapChainExtent.width, m_VSwapChainExtent.height,
 						  depthFormat,
 						  VK_IMAGE_TILING_OPTIMAL,
@@ -485,12 +472,15 @@ void LVForwardPlusRenderCore::CreateTextureSampler() {
 		LUtility::RuntimeError("Failed To Create Texture Sampler.");
 }
 
-void LVForwardPlusRenderCore::CreateTexture() {
+void LVForwardPlusRenderCore::CreateTexture(const std::string& _path, int _i) { 
+
 	LVWrapper<VkImage> stagingImage{ m_VContext->GetDevice(), vkDestroyImage };
 	LVWrapper<VkDeviceMemory> stagingImageMemory{ m_VContext->GetDevice(), vkFreeMemory };
-	LUtility::CreateTextureImage("textures/chalet.jpg", stagingImage, stagingImageMemory, m_TextureImage, m_TextureImageMemory, 
+	LUtility::CreateTextureImage(_path, stagingImage, stagingImageMemory, m_TextureImages[_i], m_TextureImageMemories[_i], 
 								m_VContext->GetDevice(), m_VContext->GetPhysicalDevice(), m_VContext->GetGraphicsQueue(), m_VContext->GetCommandPool() );
-	LUtility::CreateTextureImageView(m_TextureImage, m_TextureImageView, m_VContext->GetDevice());
+	LUtility::CreateTextureImageView(m_TextureImages[_i], m_TextureImageViews[_i], m_VContext->GetDevice());
+
+
 }
 
 void LVForwardPlusRenderCore::CreateUniformBuffer() {
@@ -560,7 +550,7 @@ void LVForwardPlusRenderCore::CreateDescriptorPool() {
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 1;
+	poolSizes[1].descriptorCount = 4;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; //Note: Need Extra Combined Image Sampler for IMGUI
 	poolSizes[2].descriptorCount = 1;
 
@@ -572,6 +562,52 @@ void LVForwardPlusRenderCore::CreateDescriptorPool() {
 	poolInfo.maxSets = 2;
 	if (vkCreateDescriptorPool(m_VContext->GetDevice(), &poolInfo, nullptr, m_VDecriptorPool.Replace()) != VK_SUCCESS)
 		LUtility::RuntimeError("Failed To Create Descriptor Pool.");
+}
+
+void LVForwardPlusRenderCore::CreateDescriptorSetLayout() {
+
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding sampler0 = {};
+	sampler0.binding = 1;
+	sampler0.descriptorCount = 1;           
+	sampler0.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler0.pImmutableSamplers = nullptr;
+	sampler0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding sampler1 = {};
+	sampler1.binding = 2;
+	sampler1.descriptorCount = 1;           
+	sampler1.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler1.pImmutableSamplers = nullptr;
+	sampler1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding sampler2 = {};
+	sampler2.binding = 3;
+	sampler2.descriptorCount = 1;
+	sampler2.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler2.pImmutableSamplers = nullptr;
+	sampler2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding sampler3 = {};
+	sampler3.binding = 4;
+	sampler3.descriptorCount = 1;
+	sampler3.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler3.pImmutableSamplers = nullptr;
+	sampler3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::array<VkDescriptorSetLayoutBinding, 5> bindings = { uboLayoutBinding, sampler0, sampler1, sampler2, sampler3 };
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+	if (vkCreateDescriptorSetLayout(m_VContext->GetDevice(), &layoutInfo, nullptr, m_VDescriptorSetLayout.Replace()) != VK_SUCCESS)
+		LUtility::RuntimeError("Failed To Create Descriptor Set Layout.");
 }
 
 void LVForwardPlusRenderCore::CreateDescriptorSet() {
@@ -589,12 +625,7 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	bufferInfo.offset = 0;
 	bufferInfo.range = sizeof(LUtility::UniformBufferObject);
 
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = m_TextureImageView;
-	imageInfo.sampler =	  m_VTextureSampler;
-
-	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+	std::array<VkWriteDescriptorSet, 5> descriptorWrites = {};
 
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = m_VDescriptorSet;
@@ -604,6 +635,12 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	descriptorWrites[0].descriptorCount = 1;
 	descriptorWrites[0].pBufferInfo = &bufferInfo;
 
+	//Texture 0
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = m_TextureImageViews[0];
+	imageInfo.sampler = m_VTextureSampler;
+
 	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[1].dstSet = m_VDescriptorSet;
 	descriptorWrites[1].dstBinding = 1;
@@ -612,6 +649,48 @@ void LVForwardPlusRenderCore::CreateDescriptorSet() {
 	descriptorWrites[1].descriptorCount = 1;
 	descriptorWrites[1].pImageInfo = &imageInfo;
 
+	//Texture 1
+	VkDescriptorImageInfo image1Info = {};
+	image1Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image1Info.imageView = m_TextureImageViews[1];
+	image1Info.sampler   = m_VTextureSampler;
+	
+	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[2].dstSet = m_VDescriptorSet;
+	descriptorWrites[2].dstBinding = 2;
+	descriptorWrites[2].dstArrayElement = 0;
+	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[2].descriptorCount = 1;
+	descriptorWrites[2].pImageInfo = &image1Info;
+
+	//Texture 2
+	VkDescriptorImageInfo image2Info = {};
+	image2Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image2Info.imageView = m_TextureImageViews[2];
+	image2Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[3].dstSet = m_VDescriptorSet;
+	descriptorWrites[3].dstBinding = 3;
+	descriptorWrites[3].dstArrayElement = 0;
+	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[3].descriptorCount = 1;
+	descriptorWrites[3].pImageInfo = &image2Info;
+
+	//Texture 2
+	VkDescriptorImageInfo image3Info = {};
+	image3Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image3Info.imageView = m_TextureImageViews[3]; //<TODO: Update!!
+	image3Info.sampler = m_VTextureSampler;
+
+	descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[4].dstSet = m_VDescriptorSet;
+	descriptorWrites[4].dstBinding = 4;
+	descriptorWrites[4].dstArrayElement = 0;
+	descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[4].descriptorCount = 1;
+	descriptorWrites[4].pImageInfo = &image3Info;
+	
 	vkUpdateDescriptorSets(m_VContext->GetDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
